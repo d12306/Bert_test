@@ -325,8 +325,20 @@ def train_lr_snli(args):
 				saveName = 'snli_model'
 				np.save('weights/' + saveName, weights)
 
-
 def svd_decomposition(data, k):
+
+	# singular value decomposition
+	U, s, V = la.svd(data, full_matrices=False)
+	# choose top k important singular values (or eigens)
+	Uk = U[:, 0:k]
+	Sk = np.diag(s[0:k])
+	Vk = V[0:k, :]
+	# recover 
+	data_new = np.matmul(Uk, np.matmul(Sk ,Vk))
+
+	return data_new
+
+def svd_decomposition_single(data, k):
 	recovered_data = []
 	iterations=0
 	for sub in data:
@@ -368,9 +380,9 @@ if __name__ == "__main__":
     parser.add_argument('-g', '--gpu', type=int, default=1, help='which GPU to use')
     parser.add_argument('-seed', '--seed', type=int, default=100, help='seed')
     parser.add_argument('-s', '--saveModel', type=int, default=1, help='Whether we save this model')
-    parser.add_argument('-a', '--action', type=int, default=1, help='which action to work on')
+    parser.add_argument('-a', '--action', type=int, default=0, help='which action to work on')
     parser.add_argument('-svd', '--svd', type=int, default=1, help='whether to use svd to denoise the data.')
-    parser.add_argument('-k', '--k', type=int, default=1, help='the number of the singular values to keep.')
+    parser.add_argument('-k', '--k', type=int, default=100, help='the number of the singular values to keep.')
 
     args = parser.parse_args()
     seed_everything(args.seed)
