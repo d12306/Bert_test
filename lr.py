@@ -129,6 +129,23 @@ def process_svd_file_snli(train_data, test_data, test_data_swapped, dev_data, de
 
 	return train_data, test_data, test_data_swapped,dev_data,dev_data_swapped  
 
+
+def process_svd_file_snli_no_save(train_data, test_data, test_data_swapped, dev_data, dev_data_swapped,k):
+	train_data = svd_decomposition(train_data, k)
+	test_data = svd_decomposition(test_data, k)
+	test_data_swapped = svd_decomposition(test_data_swapped, k)
+	dev_data = svd_decomposition(dev_data, k)
+	dev_data_swapped = svd_decomposition(dev_data_swapped, k)
+	return train_data, test_data, test_data_swapped,dev_data,dev_data_swapped  
+
+
+def process_svd_file_mnli_no_save(train_data, test_data_matched, test_data_mismatched, k):
+	train_data = svd_decomposition(train_data, k)
+	test_data_matched = svd_decomposition(test_data_matched, k)
+	test_data_mismatched = svd_decomposition(test_data_mismatched, k)
+	return train_data, test_data_matched, test_data_mismatched  
+
+
 def train_lr_mnli(args):
 	batch_size = args.batch_size
 	train_data, train_label, test_data_matched, test_label_matched, test_data_mismatched, test_label_mismatched =\
@@ -325,6 +342,82 @@ def train_lr_snli(args):
 				saveName = 'snli_model'
 				np.save('weights/' + saveName, weights)
 
+def lr_snli(args):
+	from sklearn.linear_model import LogisticRegression
+	train_data, train_label, test_data, test_data_swapped, test_label, dev_data, dev_data_swapped, dev_label =\
+	load_data_snli()
+
+	train_data_mnli, train_label_mnli, test_data_matched_mnli, test_label_matched_mnli, \
+	test_data_mismatched_mnli, test_label_mismatched_mnli =\
+	load_data_mnli()
+
+	if args.svd:
+		train_data, test_data, test_data_swapped, dev_data, dev_data_swapped = process_svd_file_snli_no_save(train_data, \
+			test_data, test_data_swapped, dev_data, dev_data_swapped,args.k)
+		train_data_mnli, test_data_matched_mnli, test_data_mismatched_mnli =\
+		 process_svd_file_mnli_no_save(train_data_mnli, test_data_matched_mnli, test_data_mismatched_mnli, args.k)
+
+	model = LogisticRegression()
+
+	model.fit(train_data,train_label)
+	test_predictions = model.score(test_data,test_label)
+	dev_predictions = model.score(dev_data, dev_label)
+	test_swapped_predictions = model.score(test_data_swapped,test_label)
+	dev_swapped_predictions = model.score(dev_data_swapped,dev_label)
+	#cross domain acc
+	dev_matched_predictions = model.score(test_data_matched_mnli, test_label_matched_mnli)
+	dev_mismatched_predictions = model.score(test_data_mismatched_mnli,test_label_mismatched_mnli)
+
+	if args.svd:
+		print('using svd!')
+	from joblib import dump, load
+	dump(model, 'snli_'+str(args.svd)+'_'+str(args.k)+'.joblib')
+	# clf = load('filename.joblib')  
+	print('source domain snli')
+	print(test_predictions, dev_predictions, test_swapped_predictions, dev_swapped_predictions)
+	print('cross domain mnli')
+	print(dev_matched_predictions,dev_mismatched_predictions)
+
+
+
+def lr_mnli(args):
+	from sklearn.linear_model import LogisticRegression
+	train_data, train_label, test_data_matched, test_label_matched, test_data_mismatched, test_label_mismatched =\
+	load_data_mnli()
+
+	train_data_snli, train_label_snli, test_data_snli, test_data_swapped_snli, test_label_snli,\
+	 dev_data_snli, dev_data_swapped_snli, dev_label_snli =\
+	load_data_snli()
+
+
+	if args.svd:
+		train_data, test_data_matched, test_data_mismatched =\
+		 process_svd_file_mnli_no_save(train_data, test_data_matched, test_data_mismatched, args.k)
+		train_data_snli, test_data_snli, test_data_swapped_snli, dev_data_snli, dev_data_swapped_snli\
+		 = process_svd_file_snli_no_save(train_data_snli, \
+			test_data_snli, test_data_swapped_snli, dev_data_snli, dev_data_swapped_snli,args.k)
+
+
+	model = LogisticRegression()
+	model.fit(train_data,train_label)
+	dev_matched_predictions = model.score(test_data_matched, test_label_matched)
+	dev_mismatched_predictions = model.score(test_data_mismatched,test_label_mismatched)
+	#cross domain
+	test_predictions = model.score(test_data_snli,test_label_snli)
+	dev_predictions = model.score(dev_data_snli, dev_label_snli)
+	test_swapped_predictions = model.score(test_data_swapped_snli,test_label_snli)
+	dev_swapped_predictions = model.score(dev_data_swapped_snli,dev_label_snli)
+
+	if args.svd:
+		print('using svd!')
+	from joblib import dump, load
+	dump(model, 'mnli_'+str(args.svd)+'_'+str(args.k)+'.joblib')
+	# clf = load('filename.joblib')  
+	print('source domain mnli')
+	print(dev_matched_predictions, dev_mismatched_predictions)
+	print('cross domain snli')
+	print(test_predictions, dev_predictions, test_swapped_predictions, dev_swapped_predictions)
+
 def svd_decomposition(data, k):
 
 	# singular value decomposition
@@ -381,8 +474,8 @@ if __name__ == "__main__":
     parser.add_argument('-seed', '--seed', type=int, default=100, help='seed')
     parser.add_argument('-s', '--saveModel', type=int, default=1, help='Whether we save this model')
     parser.add_argument('-a', '--action', type=int, default=0, help='which action to work on')
-    parser.add_argument('-svd', '--svd', type=int, default=1, help='whether to use svd to denoise the data.')
-    parser.add_argument('-k', '--k', type=int, default=100, help='the number of the singular values to keep.')
+    parser.add_argument('-svd', '--svd', type=int, default=0, help='whether to use svd to denoise the data.')
+    parser.add_argument('-k', '--k', type=int, default=700, help='the number of the singular values to keep.')
 
     args = parser.parse_args()
     seed_everything(args.seed)
@@ -395,8 +488,8 @@ if __name__ == "__main__":
     set_session(tf.Session(config=config))
 
     if args.action == 0:
-        train_lr_mnli(args)
+        lr_mnli(args)
     if args.action == 1:
-        train_lr_snli(args)
+        lr_snli(args)
 
 
