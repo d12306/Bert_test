@@ -423,13 +423,27 @@ def svd_decomposition(data, k):
 	# singular value decomposition
 	U, s, V = la.svd(data, full_matrices=False)
 	# choose top k important singular values (or eigens)
-	Uk = U[:, 0:k]
-	Sk = np.diag(s[0:k])
-	Vk = V[0:k, :]
+	Uk = U[:, 1:k]
+	Sk = np.diag(s[1:k])
+	Vk = V[1:k, :]
+	# import ipdb
+	# ipdb.set_trace()
+	# plot_eigen_values(s[:10])
 	# recover 
 	data_new = np.matmul(Uk, np.matmul(Sk ,Vk))
 
+	import ipdb
+	ipdb.set_trace()
+	# import matplotlib.pyplot as plt
+	# plt.plot(np.sort((data_new-data).reshape(-1))[:-100])
+	# plt.show()
+
 	return data_new
+
+def plot_eigen_values(data):
+	import matplotlib.pyplot as plt
+	plt.plot(data,'*')
+	plt.show()
 
 def svd_decomposition_single(data, k):
 	recovered_data = []
@@ -475,7 +489,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--saveModel', type=int, default=1, help='Whether we save this model')
     parser.add_argument('-a', '--action', type=int, default=0, help='which action to work on')
     parser.add_argument('-svd', '--svd', type=int, default=0, help='whether to use svd to denoise the data.')
-    parser.add_argument('-k', '--k', type=int, default=700, help='the number of the singular values to keep.')
+    parser.add_argument('-k', '--k', type=int, default=768, help='the number of the singular values to keep.')
 
     args = parser.parse_args()
     seed_everything(args.seed)
