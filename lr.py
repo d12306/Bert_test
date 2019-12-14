@@ -342,6 +342,10 @@ def train_lr_snli(args):
 				saveName = 'snli_model'
 				np.save('weights/' + saveName, weights)
 
+def save_prediction(prediction, name):
+	np.save('./'+name+'.npy',prediction)
+
+
 def lr_snli(args):
 	from sklearn.linear_model import LogisticRegression
 	train_data, train_label, test_data, test_data_swapped, test_label, dev_data, dev_data_swapped, dev_label =\
@@ -367,6 +371,16 @@ def lr_snli(args):
 	#cross domain acc
 	dev_matched_predictions = model.score(test_data_matched_mnli, test_label_matched_mnli)
 	dev_mismatched_predictions = model.score(test_data_mismatched_mnli,test_label_mismatched_mnli)
+
+	matched_class=model.predict(test_data_matched_mnli)
+	mismatched_class=model.predict(test_data_mismatched_mnli)
+	if not args.svd:
+		np.save('mnli_matched.npy',matched_class)
+		np.save('mnli_mismatched.npy',mismatched_class)
+	else:
+		np.save('mnli_matched_svd.npy',matched_class)
+		np.save('mnli_mismatched_svd.npy',mismatched_class)
+
 
 	if args.svd:
 		print('using svd!')
@@ -408,6 +422,23 @@ def lr_mnli(args):
 	test_swapped_predictions = model.score(test_data_swapped_snli,test_label_snli)
 	dev_swapped_predictions = model.score(dev_data_swapped_snli,dev_label_snli)
 
+
+
+	test_class=model.predict(test_data_snli)
+	dev_class=model.predict(dev_data_snli)
+	test_swapped_class=model.predict(test_data_swapped_snli)
+	dev_swapped_class=model.predict(dev_data_swapped_snli)
+	if not args.svd:
+		np.save('snli_test.npy',test_class)
+		np.save('snli_dev.npy',dev_class)
+		np.save('snli_test_swapped.npy',test_swapped_class)
+		np.save('snli_dev_swapped.npy',dev_swapped_class)
+	else:
+		np.save('snli_test_svd.npy',test_class)
+		np.save('snli_dev_svd.npy',dev_class)
+		np.save('snli_test_swapped_svd.npy',test_swapped_class)
+		np.save('snli_dev_swapped_svd.npy',dev_swapped_class)
+
 	if args.svd:
 		print('using svd!')
 	from joblib import dump, load
@@ -432,8 +463,8 @@ def svd_decomposition(data, k):
 	# recover 
 	data_new = np.matmul(Uk, np.matmul(Sk ,Vk))
 
-	import ipdb
-	ipdb.set_trace()
+	# import ipdb
+	# ipdb.set_trace()
 	# import matplotlib.pyplot as plt
 	# plt.plot(np.sort((data_new-data).reshape(-1))[:-100])
 	# plt.show()
@@ -475,7 +506,84 @@ def seed_everything(seed):
     import os
     os.environ['PYTHONHASHSEED'] = str(seed)
 
+def differ_index_function(prediction, prediction_svd, label):#differ_index_function_while_svd_is_true
+	svd_true_index=[idx for idx in range(len(prediction_svd)) if prediction_svd[idx]==label[idx]]
+	differ_index=[idx for idx in svd_true_index if prediction_svd[idx]!=prediction[idx]]
 
+	return differ_index
+
+# def differ_index_function(prediction, prediction_svd, label):
+# 	# svd_true_index=[idx for idx in range(len(prediction_svd)) if prediction_svd[idx]==label[idx]]
+# 	differ_index=[idx for idx in range(len(prediction_svd)) if prediction_svd[idx]!=prediction[idx]]
+
+# 	return differ_index
+
+
+def extract_different_prediction_snli2mnli():
+	mismatched_label=np.load('/home/xfdu/bert/NLI Data/multinli_1.0/multinli_1.0_dev_mismatched_label.npy')
+	matched_label=np.load('/home/xfdu/bert/NLI Data/multinli_1.0/multinli_1.0_dev_matched_label.npy')
+	prediction_matched=np.load('./mnli_matched.npy')
+	prediction_mismatched=np.load('./mnli_mismatched.npy')
+	prediction_matched_svd=np.load('./mnli_matched_svd.npy')
+	prediction_mismatched_svd=np.load('./mnli_mismatched_svd.npy')
+
+	matched_differ_index = differ_index_function(prediction_matched,prediction_matched_svd, matched_label)
+	mismatched_differ_index=differ_index_function(prediction_mismatched,prediction_mismatched_svd,mismatched_label)
+	with open('/home/xfdu/bert/NLI Data/multinli_1.0/multinli_1.0_dev_matched_input.txt') as foo:
+		matched_text=foo.readlines()
+	with open('/home/xfdu/bert/NLI Data/multinli_1.0/multinli_1.0_dev_mismatched_input.txt') as foo:
+		mismatched_text=foo.readlines()
+
+
+	file=open('./cross_domain_snli2mnli_different_predictions_dev_matched_2.txt', 'w')
+	for index in matched_differ_index:
+		file.write(matched_text[index])
+	file.close()
+	file=open('./cross_domain_snli2mnli_different_predictions_dev_mismatched_2.txt', 'w')
+	for index in mismatched_differ_index:
+		file.write(mismatched_text[index])
+	file.close()
+
+			
+	return matched_text, mismatched_text, matched_differ_index, mismatched_differ_index
+
+def extract_different_prediction_mnli2snli():
+	dev_label=np.load('/home/xfdu/bert/NLI Data/snli_1.0/snli_1.0_dev_label.npy')
+	test_label=np.load('/home/xfdu/bert/NLI Data/snli_1.0/snli_1.0_test_label.npy')
+	prediction_dev=np.load('./snli_dev.npy')
+	prediction_dev_svd=np.load('./snli_dev_svd.npy')
+	prediction_test=np.load('./snli_test.npy')
+	prediction_test_svd=np.load('./snli_test_svd.npy')
+	prediction_dev_swapped=np.load('./snli_dev_swapped.npy')
+	prediction_dev_swapped_svd=np.load('./snli_dev_swapped_svd.npy')
+	prediction_test_swapped=np.load('./snli_test_swapped.npy')
+	prediction_test_swapped_svd=np.load('./snli_test_swapped_svd.npy')
+
+	dev_differ_index = differ_index_function(prediction_dev,prediction_dev_svd, dev_label)
+	dev_swapped_differ_index=differ_index_function(prediction_dev_swapped,prediction_dev_swapped_svd,dev_label)
+	test_differ_index = differ_index_function(prediction_test,prediction_test_svd, test_label)
+	test_swapped_differ_index=differ_index_function(prediction_test_swapped,prediction_test_swapped_svd,test_label)
+	with open('/home/xfdu/bert/NLI Data/snli_1.0/snli_1.0_dev_input.txt') as foo:
+		dev_text=foo.readlines()
+	with open('/home/xfdu/bert/NLI Data/snli_1.0/snli_1.0_dev_swap_input.txt') as foo:
+		dev_swapped_text=foo.readlines()
+	with open('/home/xfdu/bert/NLI Data/snli_1.0/snli_1.0_test_input.txt') as foo:
+		test_text=foo.readlines()
+	with open('/home/xfdu/bert/NLI Data/snli_1.0/snli_1.0_test_swap_input.txt') as foo:
+		test_swapped_text=foo.readlines()	
+
+	file=open('./cross_domain_mnli2snli_different_predictions_dev_2.txt', 'w')
+	for index in dev_differ_index:
+		file.write(dev_text[index])
+	file.close()
+	file=open('./cross_domain_mnli2snli_different_predictions_test_2.txt', 'w')
+	for index in test_differ_index:
+		file.write(test_text[index])
+	file.close()
+
+
+	return dev_text,dev_swapped_text,test_text,test_swapped_text,\
+	 dev_differ_index, dev_swapped_differ_index, test_differ_index, test_swapped_differ_index
 
 if __name__ == "__main__":
     import argparse
@@ -488,7 +596,7 @@ if __name__ == "__main__":
     parser.add_argument('-seed', '--seed', type=int, default=100, help='seed')
     parser.add_argument('-s', '--saveModel', type=int, default=1, help='Whether we save this model')
     parser.add_argument('-a', '--action', type=int, default=0, help='which action to work on')
-    parser.add_argument('-svd', '--svd', type=int, default=0, help='whether to use svd to denoise the data.')
+    parser.add_argument('-svd', '--svd', type=int, default=1, help='whether to use svd to denoise the data.')
     parser.add_argument('-k', '--k', type=int, default=768, help='the number of the singular values to keep.')
 
     args = parser.parse_args()
@@ -505,5 +613,16 @@ if __name__ == "__main__":
         lr_mnli(args)
     if args.action == 1:
         lr_snli(args)
+    if args.action == 2:
+    	matched_text, mismatched_text, matched_differ_index, mismatched_differ_index=extract_different_prediction_snli2mnli()
+    	import ipdb
+    	ipdb.set_trace()
+    if args.action == 3:
+    	dev_text,dev_swapped_text,test_text,test_swapped_text,\
+    	 dev_differ_index, dev_swapped_differ_index, test_differ_index, test_swapped_differ_index = \
+    	 extract_different_prediction_mnli2snli()
+    	import ipdb
+    	ipdb.set_trace()
+
 
 
